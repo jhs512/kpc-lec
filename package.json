@@ -1,0 +1,7 @@
+{
+  "name": "kpc-lec",
+  "private": true,
+  "type": "module",
+  "scripts": {"build": "node scripts/build.mjs", "serve": "node scripts/serve.mjs", "test": "node --test tests/site.test.mjs tests/speech.test.mjs"},
+  "devDependencies": {"marked": "18.0.12"}
+}
