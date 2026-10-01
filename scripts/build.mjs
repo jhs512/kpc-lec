@@ -27,6 +27,7 @@ async function page(p,source,{kind='lesson',index=-1,hours,related=[]}={}){
   md=md.replace(/<!-- period-navigation:start -->[\s\S]*?<!-- period-navigation:end -->/g,'');
   md=md.replace(/## (원자료와 이어서 보기|이어서 보기|교시별 이동|원자료)\n[\s\S]*?(?=\n## |$)/g,'');
   md=md.replace(/\(surl:(\d+)(?:#[^)]*)?\)/g,(_,id)=>`(${routes.get(Number(id))||base})`);
+  md=md.replaceAll('https://github.com/jhs512/kpc-finance-course/releases/latest/download/kpc-finance.zip',base+'assets/kpc-finance.zip');
   const headings=[];let n=0;
   const renderer={
     heading({tokens,depth}){const text=this.parser.parseInline(tokens);if(depth===1)return '';const id=`section-${++n}`;if(depth===2||depth===3)headings.push({id,text,depth});return `<h${depth} id="${id}" class="tts-readable">${text}</h${depth}>`;},
