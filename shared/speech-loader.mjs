@@ -23,7 +23,7 @@ export function initializeTts(button) {
     }
     if (cleanup) return;
     try {
-      modulePromise ||= import('./speech.mjs?v=20260917-pronunciation').catch(error => { modulePromise = undefined; throw error; });
+      modulePromise ||= import('./speech.mjs?v=20261002-layout').catch(error => { modulePromise = undefined; throw error; });
       const speech = await modulePromise;
       if (!enabled || token !== revision) return;
       style = document.createElement('link');

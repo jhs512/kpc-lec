@@ -1,4 +1,4 @@
-import {initializeTts} from '../shared/speech-loader.mjs';
+import {initializeTts} from '../shared/speech-loader.mjs?v=20261002-layout';
 import Prism from '../shared/vendor/prism.mjs';
 initializeTts(document.querySelector('#tts-toggle'));
 Prism.highlightAll();
