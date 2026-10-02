@@ -16,7 +16,7 @@ export function mountSpeech(main) {
   document.body.append(panel);
   const notice = document.createElement('p'); notice.className = 'speech-notice'; notice.setAttribute('role', 'status'); notice.hidden = true;
   const content = document.querySelector('main');
-  if (content) content.before(notice); else main.append(notice);
+  if (content) content.prepend(notice); else main.append(notice);
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
     notice.hidden = false; notice.textContent = '이 브라우저는 읽어주기를 지원하지 않습니다.';
     return () => { panel.remove(); notice.remove(); };
