@@ -1,4 +1,5 @@
-import { splitSpeechRanges, speechSentences, koreanVoice, StorySpeech, speechRates } from './speech-engine.mjs?v=20260917-pronunciation';
+import { koreanVoice, StorySpeech, speechRates } from './speech-engine.mjs?v=20261002-continuous';
+import { pageSpeechQueue } from './speech-queue.mjs';
 import { excluded, visible, readableText, mapSpeechText, speechRanges, speechChunkText } from './speech-text.mjs';
 import { createSpeechHighlight } from './speech-highlight.mjs';
 export { visible, readableText } from './speech-text.mjs';
@@ -12,7 +13,7 @@ export function mountSpeech(main) {
   const panel = document.createElement('section');
   panel.className = 'speech-controls'; panel.dataset.speechControls = ''; panel.hidden = true;
   panel.setAttribute('aria-label', '텍스트 읽어주기');
-  panel.innerHTML = `<button type="button" class="speech-close" aria-label="읽어주기 닫기 및 정지">닫기 ×</button><div class="speech-buttons"><button type="button" data-action="play" disabled>이어읽기</button><button type="button" data-action="pause" disabled>일시정지</button><button type="button" data-action="stop" disabled>정지</button><label>속도 <select aria-label="읽기 속도">${speechRates.map(rate => `<option value="${rate}"${rate === savedRate ? ' selected' : ''}>${rate}배</option>`).join('')}</select></label></div><div class="speech-context" hidden aria-label="낭독 문맥" aria-live="off">${['이전 문장', '현재 읽는 문장', '다음 문장'].map((label, i) => `<div class="speech-context-item${i === 1 ? ' speech-current-sentence' : ''}"><span class="speech-context-label">${label}</span><p data-sentence="${i - 1}" tabindex="0"></p></div>`).join('')}</div><p class="speech-status" role="status"></p><p class="speech-help">이어읽기는 멈춘 문장부터, 속도는 다음 문장부터 적용됩니다. 화면을 떠나면 정지합니다.</p>`;
+  panel.innerHTML = `<button type="button" class="speech-close" aria-label="읽어주기 닫기 및 정지">닫기 ×</button><div class="speech-buttons"><button type="button" data-action="play" disabled>이어읽기</button><button type="button" data-action="pause" disabled>일시정지</button><button type="button" data-action="stop" disabled>정지</button><label>속도 <select aria-label="읽기 속도">${speechRates.map(rate => `<option value="${rate}"${rate === savedRate ? ' selected' : ''}>${rate}배</option>`).join('')}</select></label></div><div class="speech-context" hidden aria-label="낭독 문맥" aria-live="off">${['이전 문장', '현재 읽는 문장', '다음 문장'].map((label, i) => `<div class="speech-context-item${i === 1 ? ' speech-current-sentence' : ''}"><span class="speech-context-label">${label}</span><p data-sentence="${i - 1}" tabindex="0"></p></div>`).join('')}</div><p class="speech-status" role="status"></p><p class="speech-help">누른 위치부터 페이지 끝까지 읽습니다. 이어읽기는 멈춘 문장부터, 속도는 다음 문장부터 적용됩니다. 화면을 떠나면 정지합니다.</p>`;
   document.body.append(panel);
   const notice = document.createElement('p'); notice.className = 'speech-notice'; notice.setAttribute('role', 'status'); notice.hidden = true;
   const content = document.querySelector('main');
@@ -29,6 +30,11 @@ export function mountSpeech(main) {
   const controller = new StorySpeech(synth, window.SpeechSynthesisUtterance, [], ({ state, message, index }) => {
     if (disposed) return;
     const chunk = chunks?.[index];
+    if (['starting', 'speaking'].includes(state) && chunk) {
+      if (!eligible(chunk.node) || readableText(chunk.node) !== chunk.mapping.text) { controller.stop(); return; }
+      if (active !== chunk.node) active?.classList.remove('speech-active');
+      active = chunk.node; mapping = chunk.mapping; spokenText = mapping.text;
+    }
     if (state === 'speaking' && mapping && chunk) {
       highlight.show(speechRanges(mapping, chunk.sentenceStart, chunk.sentenceEnd));
       if (shownSentence !== chunk.sentenceIndex) {
@@ -120,7 +126,12 @@ export function mountSpeech(main) {
           button.onclick = event => {
             event.preventDefault(); event.stopPropagation();
             const current = readableText(node); if (disposed || !eligible(node) || !current) return;
-            if (active !== node || current !== spokenText) { dismiss(); active?.classList.remove('speech-active'); active = node; spokenText = current; mapping = mapSpeechText(node); sentences = speechSentences(mapping.text); chunks = splitSpeechRanges(mapping.text); controller.chunks = chunks.map(chunk => speechChunkText(mapping, chunk.start, chunk.end)); }
+            if (active !== node || current !== spokenText || !['starting', 'speaking', 'paused'].includes(controller.state)) {
+              dismiss(); active?.classList.remove('speech-active'); active = node; spokenText = current;
+              const nodes = [...main.querySelectorAll('.tts-readable')].filter(eligible);
+              ({ chunks, sentences } = pageSpeechQueue(nodes, node, mapSpeechText, speechChunkText));
+              controller.chunks = chunks.map(chunk => chunk.utterance);
+            }
             origin = button; controller.start();
           };
         }

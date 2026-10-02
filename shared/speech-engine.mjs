@@ -87,6 +87,7 @@ export class StorySpeech {
     };
     utterance.onerror = fail;
     this.state = 'starting'; this.emit(`재생 준비 중 · ${this.index + 1}/${this.chunks.length}`);
+    if (!valid()) return; // The page can stop a removed or changed block during update.
     this.timer = this.timers.setTimeout(fail, 12000);
     try { this.synth.speak(utterance); } catch { fail(); }
   }

@@ -1,8 +1,38 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { splitSpeech, splitSpeechRanges, speechSentences, koreanVoice, StorySpeech } from '../shared/speech-engine.mjs';
+import { pageSpeechQueue } from '../shared/speech-queue.mjs';
 
 const ko = { name: '한국어', lang: 'ko-KR', localService: true };
+test('page queue starts at the selected block and preserves local highlight offsets', () => {
+  const nodes = [{text:'앞 문단.'}, {text:'선택한 문장. 다음 문장.'}, {text:''}, {text:'마지막 문단.'}];
+  const queue = pageSpeechQueue(nodes, nodes[1], node => ({text:node.text}), (map,start,end) => map.text.slice(start,end));
+  assert.deepEqual(queue.chunks.map(chunk=>chunk.utterance), ['선택한 문장.', '다음 문장.', '마지막 문단.']);
+  assert.deepEqual(queue.chunks.map(chunk=>chunk.sentenceIndex), [0,1,2]);
+  assert.equal(queue.chunks[2].node,nodes[3]);
+  assert.equal(queue.chunks[2].sentenceStart,0);
+  assert.deepEqual(pageSpeechQueue(nodes, {}, node=>({text:node.text}),()=>''),{chunks:[],sentences:[]});
+});
+test('continuous page reading pauses across blocks and ends only after the last block', () => {
+  const {engine,spoken,states} = setup();
+  const nodes = [{text:'첫 문단.'},{text:'두 번째 문단.'},{text:'마지막 문단.'}];
+  const queue = pageSpeechQueue(nodes,nodes[0],node=>({text:node.text}),(map,start,end)=>map.text.slice(start,end));
+  engine.chunks=queue.chunks.map(chunk=>chunk.utterance);
+  engine.start(); spoken[0].onend();
+  assert.equal(spoken[1].text,'두 번째 문단.');
+  assert.ok(!states.some(state=>state.state==='ended'));
+  engine.pause(); spoken[1].onend(); assert.equal(spoken.length,2);
+  engine.start(); assert.equal(spoken[2].text,'두 번째 문단.');
+  spoken[2].onend(); assert.equal(spoken[3].text,'마지막 문단.');
+  spoken[3].onend(); assert.equal(engine.state,'ended');
+  assert.equal(states.filter(state=>state.state==='ended').length,1);
+  engine.start(); engine.stop(); spoken[4].onend(); assert.equal(spoken.length,5);
+});
+test('stopping a stale block during preparation prevents its utterance', () => {
+  const {engine,spoken}=setup();
+  engine.update=({state})=>{if(state==='starting')engine.stop();};
+  engine.start(); assert.equal(spoken.length,0); assert.equal(engine.state,'idle');
+});
 function setup(voices = [ko]) {
   const spoken = [], states = [], timers = new Map(); let id = 0;
   const synth = { getVoices: () => voices, cancel() {}, resume() {}, speak(u) { spoken.push(u); } };
